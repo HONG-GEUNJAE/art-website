@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>메시지 입력</title>
+    <style>
+        body {
+            font-size: 20px; /* 글자 크기 수정 */
+        }
+    </style>
+</head>
+<body>
+    <h1>메시지 입력</h1>
+    <input type="text" id="messageInput" placeholder="메시지를 입력하세요">
+    <button id="sendButton">전송</button>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+        import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAiRFEZZiRoJE72gH0ji7YIbxQD3utjuw4",
+            authDomain: "textview-dd9bb.firebaseapp.com",
+            projectId: "textview-dd9bb",
+            storageBucket: "textview-dd9bb.firebasestorage.app",
+            messagingSenderId: "663373850612",
+            appId: "1:663373850612:web:9a36fabcf59d0529483ba1",
+            measurementId: "G-K2TKL81V0L"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app, 'https://textview-dd9bb-default-rtdb.asia-southeast1.firebasedatabase.app');
+        const messagesRef = ref(database, 'messages');
+
+        // 기존 메시지의 위치 정보를 저장하기 위한 배열
+        const positions = [];
+
+        // 데이터베이스에서 메시지를 가져오는 리스너 설정
+        onValue(messagesRef, (snapshot) => {
+            positions.length = 0; // 이전 위치 정보 초기화
+            snapshot.forEach(childSnapshot => {
+                const message = childSnapshot.val();
+                positions.push({ id: childSnapshot.key, x: message.positionX, y: message.positionY });
+            });
+        });
+
+        // 메시지 개수 확인 및 오래된 메시지 삭제하는 함수
+        function checkAndDeleteMessages() {
+            if (positions.length >= 9) {
+                // 메시지 개수가 9개 이상이면, 가장 오래된 메시지 삭제
+                const oldestMessage = positions[0]; // 배열의 첫 번째가 가장 오래된 메시지
+                const oldestMessageRef = ref(database, 'messages/' + oldestMessage.id);
+                remove(oldestMessageRef); // Firebase에서 해당 메시지 삭제
+                positions.shift(); // 배열에서도 삭제
+            }
+        }
+
+        document.getElementById('sendButton').addEventListener('click', () => {
+            const messageInput = document.getElementById('messageInput');
+            const messageText = messageInput.value;
+
+            if (messageText) {
+                let positionX, positionY;
+                let validPosition = false;
+
+                // 유효한 위치 생성
+                while (!validPosition) {
+                    positionX = Math.floor(Math.random() * 1000) - 500; // 랜덤 X 좌표 범위 조정
+                    positionY = Math.floor(Math.random() * 600) - 300; // 랜덤 Y 좌표 범위 조정
+
+                    validPosition = true;
+                    for (const pos of positions) {
+                        // Y축 차이가 100 이하이거나 X축 차이가 500 이하일 때
+                        const isYClose = Math.abs(positionY - pos.y) < 100;
+                        const isXClose = Math.abs(positionX - pos.x) < 500;
+
+                        // 최소한 하나는 참이 되어야 함
+                        if (isYClose && isXClose) {
+                            validPosition = false;
+                            break;
+                        }
+                    }
+                }
+
+                // Firebase에 새 메시지 추가
+                const newMessageRef = push(messagesRef);
+                set(newMessageRef, {
+                    text: messageText,
+                    positionX: positionX,
+                    positionY: positionY
+                });
+
+                // 메시지 개수 확인 및 오래된 메시지 삭제
+                checkAndDeleteMessages();
+
+                messageInput.value = ''; // 입력 필드 초기화
+            }
+        });
+    </script>
+</body>
+</html>
